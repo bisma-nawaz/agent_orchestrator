@@ -1,0 +1,5 @@
+claude-agent-sdk
+anthropic
+python-dotenv
+aiofiles
+pandas

@@ -1,0 +1,18 @@
+.venv/
+.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+
+# Generated markdown reports (keep reports/ via .gitkeep)
+reports/*.md
+
+# Assessment PDF is confidential; do not publish to a public repo
+takehome.pdf
