@@ -22,8 +22,8 @@ async def test_single_agent():
     agent_options = ClaudeAgentOptions(
         system_prompt="You are a helpful research assistant.",
         allowed_tools=["WebSearch"],  # Simple tool for testing
-        max_turns=3,
-        temperature=0.7
+        max_turns=3
+        # temperature=0.7
     )
 
     prompt = "What is the latest version of Python and its main features?"

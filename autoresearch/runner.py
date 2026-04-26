@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import Anthropic
+from claude_agent_sdk import ClaudeAgentOptions, query
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ FIXED_QUESTIONS: List[str] = [
 ]
 
 # ---------------------------------------------------------------------------
-# LLM proposer — suggests config modifications to try
+# SDK proposer — suggests config modifications to try (no raw API calls)
 # ---------------------------------------------------------------------------
 PROPOSER_SYSTEM_PROMPT = """\
 You are an expert at improving multi-agent research systems.
@@ -69,11 +70,13 @@ Your job is to suggest ONE specific, substantive modification to the orchestrato
 configuration that will measurably improve the quality (not just the appearance)
 of its research reports.
 
-The orchestrator pipeline:
-  1. Planner   — breaks the question into N subtasks (roles + focus areas)
-  2. Agents    — each role gets its own system prompt and runs for max_turns turns
-  3. Synthesiser — merges agent outputs into a final markdown report
-  4. (Optional) Verifier — second-pass LLM to patch gaps
+The orchestrator pipeline (all steps are real SDK agents):
+  0a. Classifier  — validates & refines the input question
+  0b. Context gatherer — pre-research context sprint via WebSearch
+  1.  Planner     — breaks the question into N subtasks with per-role max_turns
+  2.  Agents      — parallel specialist SDK agents (with MCP + retry on failure)
+  3.  Synthesiser — merges agent outputs into a final markdown report
+  4.  Quality reviewer — reviews report and optionally triggers one revision pass
 
 Available agent roles (each has a tuned prompt file in orchestrator/prompts/):
   technical_researcher, practical_analyst, domain_expert,
@@ -81,18 +84,25 @@ Available agent roles (each has a tuned prompt file in orchestrator/prompts/):
   cost_and_operations_analyst, security_and_compliance_researcher
 
 Configurable levers:
+  input.classify_question      (bool — validate/refine question before pipeline)
+  input.gather_context         (bool — run pre-research context sprint)
   planning.num_agents          (int, 2–4)
   planning.instruction_modifier (str — appended to planner prompt)
+  planning.dynamic_turns       (bool — let planner assign per-agent max_turns)
   agents.roles                 (list of role names, length = num_agents)
-  agents.max_turns             (int, 5–15)
+  agents.max_turns             (int, 5–15 — fallback when dynamic_turns=False)
+  agents.retry_failed          (bool — retry failed agents with partial context)
+  agents.mcp_servers           (list — default includes Google Drive MCP when .gdrive_oauth.json exists)
   synthesis.style              ("comprehensive" | "executive" | "comparative")
   synthesis.prompt_modifier    (str — extra requirement added to synthesis prompt)
-  synthesis.include_verification (bool)
+  synthesis.quality_review     (bool — run post-synthesis quality reviewer agent)
+  synthesis.max_review_iterations (int, 1–3 — max revision loops)
 
 Rules:
   - Suggest exactly ONE change per response.
   - Changes must target substance, not surface formatting.
   - Do NOT repeat a change that already appears in the experiment history.
+  - Do NOT clear agents.mcp_servers unless experiment history shows MCP-related failures.
   - Think about what is most likely to raise the grader's four dimensions:
     comprehensiveness, accuracy, structure, specificity.
 """
@@ -106,7 +116,8 @@ class AutoresearchRunner:
         asyncio.run(runner.run_loop(n_iterations=5))
     """
 
-    PROPOSER_MODEL = "claude-haiku-4-5"
+    # Kept for reference; SDK uses the ANTHROPIC_API_KEY env var and its own default model
+    PROPOSER_SDK_MAX_TURNS = 1
 
     def __init__(
         self,
@@ -178,7 +189,7 @@ class AutoresearchRunner:
             # Step 1: Propose
             print("[Propose]")
             try:
-                modification = self._propose(current_config, best_score)
+                modification = await self._propose(current_config, best_score)
                 print(f"  Type:  {modification['type']}")
                 print(f"  Why:   {modification['description']}")
                 print(f"  Changes: {json.dumps(modification['changes'])}")
@@ -306,10 +317,15 @@ class AutoresearchRunner:
     # Proposer
     # ------------------------------------------------------------------
 
-    def _propose(
+    async def _propose(
         self, current_config: Dict[str, Any], best_score: float
     ) -> Dict[str, Any]:
-        """Ask the LLM to suggest ONE config change."""
+        """
+        Ask a Claude Agent SDK agent to suggest ONE config change.
+
+        Uses the SDK (no raw Anthropic API) with max_turns=1 and no tools —
+        the proposer only needs to reason about config, not search the web.
+        """
         history_lines = "\n".join(
             f"  #{e['attempt']:02d} [{e['status']:7s}] score={e['score']:.3f} — {e['description']}"
             for e in self.experiment_history[-8:]
@@ -326,14 +342,19 @@ class AutoresearchRunner:
             f'"changes": {{<dot-path-key>: <new-value>, ...}}}}'
         )
 
-        response = self.client.messages.create(
-            model=self.PROPOSER_MODEL,
-            max_tokens=500,
-            system=PROPOSER_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
+        options = ClaudeAgentOptions(
+            system_prompt=PROPOSER_SYSTEM_PROMPT,
+            allowed_tools=[],
+            max_turns=self.PROPOSER_SDK_MAX_TURNS,
         )
 
-        raw = response.content[0].text.strip()
+        raw_parts: List[str] = []
+        async for msg in query(prompt=prompt, options=options):
+            if hasattr(msg, "content") and msg.content:
+                raw_parts.append(str(msg.content))
+
+        raw = "\n".join(raw_parts).strip()
+
         # Strip markdown fences if present
         fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
         if fence:
