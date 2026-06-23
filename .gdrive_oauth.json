@@ -1,9 +1,0 @@
-{
-  "client_id": "198311991210-eibqr81t0d4go0anc3h2be3undk1qk4k.apps.googleusercontent.com",
-  "client_secret": "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",
-  "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
-  "access_token": "ya29.a0Aa7MYiojHaY6k-GBg89o0QPZ2kdRKbi-imJ0Aj9KfIPL3zWE9cfF6CJRqHkXjLWtEhzbv95LVKt5syGDTNuNYLJy0SbqqoD5Ce7CUNnU_oN88b3WwZzYhNyXv6LhHsh_NevpIK77szpFtSjQ--YukgNVYGEERJr6el91Jj_qhOUGmffm08-_gxlPSnGmHjujAxqTEJ0aCgYKARwSARMSFQHGX2MizhmuPgmFIrAauMLtN2NOUA0206",
-  "refresh_token": "1//03XX5tr7k2kyICgYIARAAGAMSNwF-L9Irbc6maDroKWjIDt9nrlQu-SyFJ-sbXTlH-wlbDJmuHeEj18AO3hJWFrHV97eDrVJv_qo",
-  "token_type": "Bearer",
-  "scope": "https://www.googleapis.com/auth/drive.readonly"
-}

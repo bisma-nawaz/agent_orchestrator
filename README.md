@@ -106,6 +106,8 @@ python setup_gdrive_mcp.py
 
 Follow the browser prompt. A `.gdrive_oauth.json` file is created in the project root.
 
+> **Security:** `.gdrive_oauth.json` holds your live OAuth `client_secret` and refresh token. It is git-ignored and must **never** be committed. Each user generates their own locally by running the helper above.
+
 ### 3. Enable in config
 
 The helper prints the exact MCP entry to add. Either:
