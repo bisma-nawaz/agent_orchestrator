@@ -28,7 +28,7 @@ def check_setup():
         print("   Please replace 'your-api-key-here' with your actual API key in .env")
         return False
 
-    print(f"✅ API key found: {api_key[:10]}...")
+    print("✅ API key found")
 
     # Check for required packages
     try:
