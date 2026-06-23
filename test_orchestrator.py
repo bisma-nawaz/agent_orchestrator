@@ -38,7 +38,7 @@ async def test_orchestrator():
     ]
 
     # Create reports directory
-    reports_dir = Path("reports")
+    reports_dir = _ROOT / "reports"
     reports_dir.mkdir(exist_ok=True)
 
     # Initialize orchestrator
