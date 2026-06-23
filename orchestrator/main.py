@@ -29,7 +29,7 @@ async def main():
     ]
 
     orchestrator = ResearchOrchestrator(verbose=True)
-    reports_dir = Path(__file__).resolve().parent / "reports"
+    reports_dir = _ROOT / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
