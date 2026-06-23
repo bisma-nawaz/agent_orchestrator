@@ -133,7 +133,7 @@ class ResearchOrchestrator:
                 self.config[section] = (config or {}).get(section, defaults)
 
         self.prompts_dir = Path(__file__).parent / "prompts"
-        self.prompts_dir.mkdir(exist_ok=True)
+        self.prompts_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
     # Logging
