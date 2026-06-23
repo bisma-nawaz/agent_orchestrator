@@ -47,7 +47,11 @@ _HERE = Path(__file__).parent
 _PROJECT_ROOT = _HERE.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from orchestrator.orchestrator import DEFAULT_ORCHESTRATOR_CONFIG, ResearchOrchestrator  # noqa: E402
+from orchestrator.orchestrator import (  # noqa: E402
+    DEFAULT_ORCHESTRATOR_CONFIG,
+    ResearchOrchestrator,
+    extract_message_text,
+)
 from autoresearch.grader import GradeResult, Grader  # noqa: E402
 
 load_dotenv()
@@ -350,8 +354,9 @@ class AutoresearchRunner:
 
         raw_parts: List[str] = []
         async for msg in query(prompt=prompt, options=options):
-            if hasattr(msg, "content") and msg.content:
-                raw_parts.append(str(msg.content))
+            text = extract_message_text(msg)
+            if text:
+                raw_parts.append(text)
 
         raw = "\n".join(raw_parts).strip()
 

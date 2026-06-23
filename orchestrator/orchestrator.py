@@ -93,6 +93,35 @@ _STYLE_INSTRUCTIONS: Dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# SDK message helpers
+# ---------------------------------------------------------------------------
+
+def extract_message_text(msg: Any) -> str:
+    """
+    Extract clean text from a Claude Agent SDK message.
+
+    ``AssistantMessage.content`` is a list of typed content blocks
+    (``TextBlock``, ``ThinkingBlock``, ``ToolUseBlock``, ...). Only
+    ``TextBlock`` carries answer text; calling ``str()`` on the whole list
+    leaks block reprs (e.g. ``[TextBlock(text='...'), ThinkingBlock(...)]``)
+    — and the model's private reasoning — straight into the output.
+
+    Returns the concatenated text of every text-bearing block, or the raw
+    string for messages whose ``content`` is already a plain string.
+    """
+    content = getattr(msg, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            block.text
+            for block in content
+            if isinstance(getattr(block, "text", None), str) and block.text
+        )
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -180,11 +209,9 @@ class ResearchOrchestrator:
 
         output_parts: List[str] = []
         async for msg in query(prompt=prompt, options=options):
-            if hasattr(msg, "content") and msg.content:
-                content_str = str(msg.content)
-                output_parts.append(content_str)
-                if self.verbose and "tool" in content_str.lower():
-                    self.log(f"  [SDK] tool use detected", "DEBUG")
+            text = extract_message_text(msg)
+            if text:
+                output_parts.append(text)
 
         return "\n".join(output_parts).strip()
 
@@ -277,9 +304,7 @@ class ResearchOrchestrator:
         Synchronous wrapper — calls the async planner internally via asyncio.
         Returns a list of subtask dicts: role, task, focus, max_turns.
         """
-        return asyncio.get_event_loop().run_until_complete(
-            self._plan_research_async(question, context)
-        )
+        return asyncio.run(self._plan_research_async(question, context))
 
     async def _plan_research_async(
         self, question: str, context: str = ""
